@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+import argparse
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+# ##################################################################
+# paths relative to this script, not cwd
+SCRIPT_DIR = Path(__file__).parent.resolve()
+TEST_OUT = SCRIPT_DIR / "output" / "testing"
+VENV_DIR = SCRIPT_DIR / ".venv"
+
+
+# ##################################################################
+# activate venv
+# re-exec under the venv python if we are not already in one
+def activate_venv() -> None:
+    if VENV_DIR.exists() and "VIRTUAL_ENV" not in os.environ:
+        venv_python = VENV_DIR / "bin" / "python"
+        if venv_python.exists():
+            os.execv(str(venv_python), [str(venv_python)] + sys.argv)
+
+
+activate_venv()
+
+
+# ##################################################################
+# shell
+# run a subprocess and return exit code
+def _shell(cmd: list[str], **kwargs: object) -> int:
+    return subprocess.call(cmd, **kwargs)
+
+
+# ##################################################################
+# command test
+# run pytest for a specific test target
+def command_test(args: argparse.Namespace) -> int:
+    TEST_OUT.mkdir(parents=True, exist_ok=True)
+    target = str(SCRIPT_DIR / args.target)
+    return _shell(["pytest", "-q", target, "--maxfail=1", "--disable-warnings", "--tb=short"])
+
+
+# ##################################################################
+# command lint
+# run ruff linter on the project
+def command_lint(_: argparse.Namespace) -> int:
+    return _shell(["ruff", "check", "--line-length", "120", str(SCRIPT_DIR / "src")])
+
+
+# ##################################################################
+# command check
+# run full quality gate via dazpycheck
+def command_check(_: argparse.Namespace) -> int:
+    return _shell(["dazpycheck"], cwd=str(SCRIPT_DIR))
+
+
+# ##################################################################
+# command extract
+# run the extract cli tool
+def command_extract(args: argparse.Namespace) -> int:
+    cmd = [sys.executable, str(SCRIPT_DIR / "run_cli.py"), "extract", args.url]
+    if args.raw:
+        cmd.append("--raw")
+    return _shell(cmd)
+
+
+# ##################################################################
+# main
+# parse arguments and dispatch to the right command
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="daz-web-extract")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_test = sub.add_parser("test", help="Run a single test target")
+    p_test.add_argument("target", help="e.g. src/daz_web_extract/result_test.py")
+    p_test.set_defaults(func=command_test)
+
+    p_lint = sub.add_parser("lint", help="Run linter")
+    p_lint.set_defaults(func=command_lint)
+
+    p_check = sub.add_parser("check", help="Run full suite and gates (dazpycheck)")
+    p_check.set_defaults(func=command_check)
+
+    p_extract = sub.add_parser("extract", help="Extract content from a URL")
+    p_extract.add_argument("url", help="URL to extract")
+    p_extract.add_argument("--raw", action="store_true", help="Output raw JSON")
+    p_extract.set_defaults(func=command_extract)
+
+    args = parser.parse_args(argv)
+    return args.func(args)
+
+
+# ##################################################################
+# entry point
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
