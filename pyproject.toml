@@ -7,6 +7,15 @@ name = "daz-web-extract"
 version = "0.1.0"
 description = "Async web content extraction library with three-tier fetch strategy"
 requires-python = ">=3.12"
+license = "MIT"
+authors = [
+    {name = "Darren Oakey", email = "darren@oakey.net"},
+]
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
 dependencies = [
     "httpx>=0.28.0",
     "lxml>=6.0.0",
@@ -14,6 +23,10 @@ dependencies = [
     "playwright>=1.40.0",
     "setproctitle>=1.3.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/darrenoakey/daz-web-extract"
+Repository = "https://github.com/darrenoakey/daz-web-extract"
 
 [project.optional-dependencies]
 dev = [

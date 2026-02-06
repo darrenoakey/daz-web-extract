@@ -57,12 +57,63 @@ def command_check(_: argparse.Namespace) -> int:
 
 # ##################################################################
 # command extract
-# run the extract cli tool
+# extract content from a url and print results
 def command_extract(args: argparse.Namespace) -> int:
-    cmd = [sys.executable, str(SCRIPT_DIR / "run_cli.py"), "extract", args.url]
+    import asyncio
+    import json
+    import setproctitle
+    from daz_web_extract import extract
+
+    setproctitle.setproctitle("daz-web-extract")
+    result = asyncio.run(extract(args.url))
     if args.raw:
-        cmd.append("--raw")
-    return _shell(cmd)
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        if result.success:
+            print(f"Title: {result.title}")
+            print(f"Method: {result.fetch_method}")
+            print(f"Length: {result.content_length} chars")
+            print(f"Time: {result.elapsed_ms}ms")
+            print()
+            print(result.body)
+        else:
+            print(f"Failed: {result.error}", file=sys.stderr)
+    return 0 if result.success else 1
+
+
+# ##################################################################
+# command publish
+# build and upload the package to pypi
+def command_publish(_: argparse.Namespace) -> int:
+    import shutil
+    for d in ["dist", "build"]:
+        build_dir = SCRIPT_DIR / d
+        if build_dir.exists():
+            shutil.rmtree(build_dir)
+    rc = _shell([sys.executable, "-m", "build"], cwd=str(SCRIPT_DIR))
+    if rc != 0:
+        print("Build failed", file=sys.stderr)
+        return rc
+    rc = _shell(["twine", "upload", "dist/*"], cwd=str(SCRIPT_DIR))
+    if rc != 0:
+        print("Upload failed", file=sys.stderr)
+        return rc
+    for d in ["dist", "build"]:
+        build_dir = SCRIPT_DIR / d
+        if build_dir.exists():
+            shutil.rmtree(build_dir)
+    return 0
+
+
+# ##################################################################
+# command verify
+# run lint and full test suite for pre-commit verification
+def command_verify(_: argparse.Namespace) -> int:
+    TEST_OUT.mkdir(parents=True, exist_ok=True)
+    rc = _shell(["ruff", "check", "--line-length", "120", str(SCRIPT_DIR / "src")])
+    if rc != 0:
+        return rc
+    return _shell(["pytest", "-q", str(SCRIPT_DIR / "src"), "--disable-warnings", "--tb=short", "-W", "error"])
 
 
 # ##################################################################
@@ -86,6 +137,12 @@ def main(argv: list[str]) -> int:
     p_extract.add_argument("url", help="URL to extract")
     p_extract.add_argument("--raw", action="store_true", help="Output raw JSON")
     p_extract.set_defaults(func=command_extract)
+
+    p_publish = sub.add_parser("publish", help="Build and upload to PyPI")
+    p_publish.set_defaults(func=command_publish)
+
+    p_verify = sub.add_parser("verify", help="Run lint + full test suite")
+    p_verify.set_defaults(func=command_verify)
 
     args = parser.parse_args(argv)
     return args.func(args)
