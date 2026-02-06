@@ -41,6 +41,19 @@ else:
     print(result.error)           # Human-readable error message
 ```
 
+#### Fetch Strategy
+
+Four tiers escalate automatically until one succeeds:
+
+| Tier | Method | Description |
+|------|--------|-------------|
+| 1 | `httpx` | Fast async HTTP fetch with lxml extraction (10s timeout) |
+| 2 | `trafilatura` | Thread-based extraction via trafilatura (15s timeout) |
+| 3 | `playwright-nojs` | Headless browser with JS disabled — fast SSR extraction |
+| 4 | `playwright` | Headless browser with JS enabled — full rendering for SPAs (30s timeout) |
+
+Tier 3 detects "requires javascript" phrases in the extracted content and automatically escalates to tier 4 when JavaScript is needed. HTTP 4xx/5xx responses (except 403/429) skip tier 2 and go straight to tier 3.
+
 #### Limiting fetch strategies
 
 Use the `max_tier` parameter to control how far the library escalates:
@@ -52,8 +65,11 @@ result = await extract("https://example.com", max_tier=1)
 # Use HTTP fetch + trafilatura, but skip the browser
 result = await extract("https://example.com", max_tier=2)
 
-# Use all strategies including headless browser (default)
+# Use HTTP fetch + trafilatura + browser without JS
 result = await extract("https://example.com", max_tier=3)
+
+# Use all strategies including full JS browser (default)
+result = await extract("https://example.com", max_tier=4)
 ```
 
 #### Serialization
@@ -85,10 +101,10 @@ asyncio.run(main())
 
 ### Command Line
 
-Extract content from a URL and print the result:
+Extract content from a URL via the `run` script:
 
 ```bash
-python run_cli.py extract https://example.com
+./run extract https://example.com
 ```
 
 Output:
@@ -100,42 +116,20 @@ Length: 217 chars
 Time: 142ms
 
 Example Domain
-This domain is for use in illustrative examples in documents. You may use this domain
-in literature without prior coordination or asking for permission.
+This domain is for use in illustrative examples in documents. You may use this
+domain in literature without prior coordination or asking for permission.
 More information...
 ```
 
 Get raw JSON output:
 
 ```bash
-python run_cli.py extract https://example.com --raw
+./run extract https://example.com --raw
 ```
 
-Output:
-
-```json
-{
-  "success": true,
-  "url": "https://example.com",
-  "title": "Example Domain",
-  "body": "Example Domain\nThis domain is for use in ...",
-  "error": null,
-  "fetch_method": "httpx",
-  "status_code": 200,
-  "content_length": 217,
-  "elapsed_ms": 142
-}
-```
-
-### Using via the `run` script
-
-The project includes a `run` script that automatically activates the virtual environment:
+Other commands:
 
 ```bash
-# Extract content
-./run extract https://example.com
-./run extract https://example.com --raw
-
 # Run tests
 ./run test src/daz_web_extract/result_test.py
 

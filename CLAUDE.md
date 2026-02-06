@@ -1,20 +1,27 @@
 # daz-web-extract
 
-Async Python library that extracts clean title + body text from any URL using a three-tier fetch strategy.
+Async Python library that extracts clean title + body text from any URL using a four-tier fetch strategy.
 
 ## Architecture
 
-Three-tier escalation: httpx (fast, 10s) -> trafilatura (thread executor, 15s) -> playwright (headless browser, 30s).
+Four-tier escalation: httpx (fast, 10s) -> trafilatura (thread executor, 15s) -> playwright-nojs (SSR, fast) -> playwright (full browser, 30s).
 Never throws exceptions - always returns `ExtractionResult` with `success=True|False`.
 
 ### Skip Logic
-HTTP 4xx/5xx (except 403/429) skip tier 2 and go straight to playwright.
-`max_tier` param caps which tiers are tried (1=httpx only, 2=httpx+trafilatura, 3=all).
+HTTP 4xx/5xx (except 403/429) skip tier 2 and go straight to tier 3.
+`max_tier` param caps which tiers are tried (1=httpx only, 2=+trafilatura, 3=+playwright-nojs, 4=all).
+Tier 3 detects "requires javascript" phrases and escalates to tier 4 when JS is needed.
 
 ### Concurrency
 - Tier 1: fully async-native via httpx
 - Tier 2: `run_in_executor` with `asyncio.wait_for` timeout
-- Tier 3: `asyncio.Semaphore(3)` limits concurrent browser instances
+- Tier 3/4: `asyncio.Semaphore(3)` limits concurrent browser instances
+
+### Playwright Strategy
+- Navigation uses `wait_until="domcontentloaded"` (not `networkidle`) to avoid hanging on sites with persistent connections
+- Best-effort `networkidle` wait (10s timeout) after DOM load for JS-enabled mode
+- Realistic browser User-Agent to reduce WAF 403s
+- Tier 3 (no-JS) avoids React hydration failures on SSR sites (e.g. openai.com where CDN blocks JS chunks)
 
 ## Key Files
 
@@ -22,7 +29,7 @@ HTTP 4xx/5xx (except 403/429) skip tier 2 and go straight to playwright.
 - `src/daz_web_extract/content.py` - lxml heuristic: `extract_title` (og:title > title > h1), `extract_text_content` (noise removal + block filtering)
 - `src/daz_web_extract/fetch_http.py` - Tier 1: async httpx
 - `src/daz_web_extract/fetch_trafilatura.py` - Tier 2: trafilatura via thread executor
-- `src/daz_web_extract/fetch_playwright.py` - Tier 3: playwright headless chromium
+- `src/daz_web_extract/fetch_playwright.py` - Tier 3: playwright-nojs (SSR), Tier 4: playwright with JS; `requires_javascript()` detection
 - `src/daz_web_extract/extract.py` - Orchestrator with skip logic
 - `run` - CLI facade: test, lint, check, extract, publish, verify (no separate run_cli.py)
 
@@ -37,7 +44,7 @@ HTTP 4xx/5xx (except 403/429) skip tier 2 and go straight to playwright.
 
 ## Testing
 
-89 tests total (70 content extraction tests with crafted HTML, 19 integration tests hitting example.com, httpbin.org, iana.org).
+91 tests total (70 content extraction tests with crafted HTML, 21 integration tests hitting example.com, httpbin.org, iana.org).
 pytest-asyncio with `asyncio_mode = "auto"`.
 
 ## Run Facade Architecture
