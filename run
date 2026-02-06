@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -10,79 +9,24 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).parent.resolve()
 TEST_OUT = SCRIPT_DIR / "output" / "testing"
 VENV_DIR = SCRIPT_DIR / ".venv"
+VENV_BIN = VENV_DIR / "bin"
+VENV_PYTHON = VENV_BIN / "python"
 
 
 # ##################################################################
-# activate venv
-# re-exec under the venv python if we are not already in one
-def activate_venv() -> None:
-    if VENV_DIR.exists() and "VIRTUAL_ENV" not in os.environ:
-        venv_python = VENV_DIR / "bin" / "python"
-        if venv_python.exists():
-            os.execv(str(venv_python), [str(venv_python)] + sys.argv)
-
-
-activate_venv()
-
-
-# ##################################################################
-# shell
+# shell helpers
 # run a subprocess and return exit code
 def _shell(cmd: list[str], **kwargs: object) -> int:
     return subprocess.call(cmd, **kwargs)
 
 
-# ##################################################################
-# command test
-# run pytest for a specific test target
-def command_test(args: argparse.Namespace) -> int:
-    TEST_OUT.mkdir(parents=True, exist_ok=True)
-    target = str(SCRIPT_DIR / args.target)
-    return _shell(["pytest", "-q", target, "--maxfail=1", "--disable-warnings", "--tb=short"])
+def _venv(tool: str) -> str:
+    """resolve a tool name to its venv bin path"""
+    return str(VENV_BIN / tool)
 
 
 # ##################################################################
-# command lint
-# run ruff linter on the project
-def command_lint(_: argparse.Namespace) -> int:
-    return _shell(["ruff", "check", "--line-length", "120", str(SCRIPT_DIR / "src")])
-
-
-# ##################################################################
-# command check
-# run full quality gate via dazpycheck
-def command_check(_: argparse.Namespace) -> int:
-    return _shell(["dazpycheck"], cwd=str(SCRIPT_DIR))
-
-
-# ##################################################################
-# command extract
-# extract content from a url and print results
-def command_extract(args: argparse.Namespace) -> int:
-    import asyncio
-    import json
-    import setproctitle
-    from daz_web_extract import extract
-
-    setproctitle.setproctitle("daz-web-extract")
-    result = asyncio.run(extract(args.url))
-    if args.raw:
-        print(json.dumps(result.to_dict(), indent=2))
-    else:
-        if result.success:
-            print(f"Title: {result.title}")
-            print(f"Method: {result.fetch_method}")
-            print(f"Length: {result.content_length} chars")
-            print(f"Time: {result.elapsed_ms}ms")
-            print()
-            print(result.body)
-        else:
-            print(f"Failed: {result.error}", file=sys.stderr)
-    return 0 if result.success else 1
-
-
-# ##################################################################
-# color helpers for publish output
+# color helpers for status output
 _CYAN = "\033[36m"
 _GREEN = "\033[32m"
 _RED = "\033[31m"
@@ -100,6 +44,47 @@ def _success(msg: str) -> None:
 
 def _error(msg: str) -> None:
     print(f"{_RED}{_BOLD}  ✗ {msg}{_RESET}", file=sys.stderr)
+
+
+# ##################################################################
+# command test
+# run pytest for a specific test target
+def command_test(args: argparse.Namespace) -> int:
+    TEST_OUT.mkdir(parents=True, exist_ok=True)
+    target = str(SCRIPT_DIR / args.target)
+    return _shell([_venv("pytest"), "-q", target, "--maxfail=1", "--disable-warnings", "--tb=short"])
+
+
+# ##################################################################
+# command lint
+# run ruff linter on the project
+def command_lint(_: argparse.Namespace) -> int:
+    return _shell([_venv("ruff"), "check", "--line-length", "120", str(SCRIPT_DIR / "src")])
+
+
+# ##################################################################
+# command check
+# run full quality gate via dazpycheck
+def command_check(_: argparse.Namespace) -> int:
+    return _shell(["dazpycheck"], cwd=str(SCRIPT_DIR))
+
+
+# ##################################################################
+# command extract
+# extract content from a url via venv subprocess
+def command_extract(args: argparse.Namespace) -> int:
+    cmd = [_venv("python"), "-c", ";".join([
+        "import asyncio, json, sys, setproctitle",
+        "from daz_web_extract import extract",
+        "setproctitle.setproctitle('daz-web-extract')",
+        f"r=asyncio.run(extract({args.url!r}))",
+        f"print(json.dumps(r.to_dict(),indent=2)) if {args.raw!r} else None",
+        f"print(f'Title: {{r.title}}\\nMethod: {{r.fetch_method}}\\nLength: {{r.content_length}} chars\\n"
+        f"Time: {{r.elapsed_ms}}ms\\n\\n{{r.body}}') if not {args.raw!r} and r.success else None",
+        f"print(f'Failed: {{r.error}}',file=sys.stderr) if not {args.raw!r} and not r.success else None",
+        "sys.exit(0 if r.success else 1)",
+    ])]
+    return _shell(cmd)
 
 
 # ##################################################################
@@ -126,7 +111,7 @@ def command_publish(_: argparse.Namespace) -> int:
             shutil.rmtree(build_dir)
 
     _status("Building distribution...")
-    rc = _shell([sys.executable, "-m", "build"], cwd=str(SCRIPT_DIR))
+    rc = _shell([_venv("python"), "-m", "build"], cwd=str(SCRIPT_DIR))
     if rc != 0:
         _error("Build failed")
         return rc
@@ -138,7 +123,7 @@ def command_publish(_: argparse.Namespace) -> int:
         return 1
 
     _status("Uploading to PyPI...")
-    rc = _shell(["twine", "upload"] + dist_files)
+    rc = _shell([_venv("twine"), "upload"] + dist_files)
     if rc != 0:
         _error("Upload failed")
         return rc
@@ -160,10 +145,10 @@ def command_publish(_: argparse.Namespace) -> int:
 # run lint and full test suite for pre-commit verification
 def command_verify(_: argparse.Namespace) -> int:
     TEST_OUT.mkdir(parents=True, exist_ok=True)
-    rc = _shell(["ruff", "check", "--line-length", "120", str(SCRIPT_DIR / "src")])
+    rc = _shell([_venv("ruff"), "check", "--line-length", "120", str(SCRIPT_DIR / "src")])
     if rc != 0:
         return rc
-    return _shell(["pytest", "-q", str(SCRIPT_DIR / "src"), "--disable-warnings", "--tb=short", "-W", "error"])
+    return _shell([_venv("pytest"), "-q", str(SCRIPT_DIR / "src"), "--disable-warnings", "--tb=short", "-W", "error"])
 
 
 # ##################################################################
