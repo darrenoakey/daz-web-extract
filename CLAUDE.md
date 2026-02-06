@@ -40,6 +40,14 @@ HTTP 4xx/5xx (except 403/429) skip tier 2 and go straight to playwright.
 89 tests total (70 content extraction tests with crafted HTML, 19 integration tests hitting example.com, httpbin.org, iana.org).
 pytest-asyncio with `asyncio_mode = "auto"`.
 
+## Run Facade Architecture
+
+- `run` operates on **ambient python** (no venv re-exec, no `os.execv`)
+- `_venv("tool")` resolves to `.venv/bin/<tool>` for subprocess calls
+- `command_extract` runs as a venv subprocess (can't import venv packages from ambient python)
+- `command_publish` bumps minor version, fetches PyPI token from keyring, uploads via twine
+- PyPI auth: `keyring.get_password('pypi', 'api_token')` → `TWINE_USERNAME=__token__` + `TWINE_PASSWORD`
+
 ## Gotchas
 
 - pyproject.toml build-backend must be `setuptools.build_meta` (not `setuptools.backends._legacy:_Backend`)
@@ -49,3 +57,4 @@ pytest-asyncio with `asyncio_mode = "auto"`.
 - Noise filtering uses tags, CSS classes, element IDs, and ARIA roles (not just tags)
 - The function is `extract_text_content` (not `extract_body_text`) - named for article text extraction vs future site-driving extractions
 - Link text within paragraphs is preserved (links are part of article content); all HTML formatting is stripped
+- `subprocess.call` does NOT expand shell globs — use `glob.glob()` to expand `dist/*` etc.
