@@ -1,6 +1,6 @@
 import pytest
 
-from daz_web_extract.fetch_playwright import fetch_playwright
+from daz_web_extract.fetch_playwright import fetch_playwright, _dismiss_cookie_consent, COOKIE_CONSENT_SELECTORS
 
 
 # ##################################################################
@@ -30,3 +30,30 @@ async def test_fetch_playwright_invalid_url_returns_failure():
     assert result.fetch_method == "playwright"
     assert result.elapsed_ms >= 0
     assert result.error is not None
+
+
+# ##################################################################
+# test cookie consent selectors list is populated
+# verify the selectors list covers common patterns
+def test_cookie_consent_selectors_list_is_populated():
+    assert len(COOKIE_CONSENT_SELECTORS) >= 10
+    accept_selectors = [s for s in COOKIE_CONSENT_SELECTORS if "Accept" in s or "ACCEPT" in s]
+    assert len(accept_selectors) >= 3
+
+
+# ##################################################################
+# test dismiss cookie consent on page without consent dialog
+# should return without error on pages that have no cookie banner
+@pytest.mark.asyncio
+async def test_dismiss_cookie_consent_on_page_without_consent_dialog():
+    from playwright.async_api import async_playwright
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.goto("https://example.com", wait_until="networkidle")
+            await _dismiss_cookie_consent(page)
+            html = await page.content()
+            assert "Example" in html
+        finally:
+            await browser.close()

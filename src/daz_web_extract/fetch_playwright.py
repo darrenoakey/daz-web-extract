@@ -11,6 +11,22 @@ from daz_web_extract.result import ExtractionResult, make_success, make_failure
 TIMEOUT_MS = 30000
 _browser_semaphore = asyncio.Semaphore(3)
 
+COOKIE_CONSENT_SELECTORS = [
+    'button:has-text("ACCEPT")',
+    'button:has-text("Accept All")',
+    'button:has-text("Accept all")',
+    'button:has-text("Accept")',
+    '#onetrust-accept-btn-handler',
+    '.accept-cookies',
+    'button:has-text("I agree")',
+    'button:has-text("Allow all")',
+    'button:has-text("OK")',
+    'button:has-text("Got it")',
+    'button:has-text("Agree")',
+    '[data-testid="cookie-accept"]',
+    'button:has-text("Continue")',
+]
+
 
 # ##################################################################
 # fetch playwright
@@ -33,8 +49,23 @@ async def fetch_playwright(url: str) -> ExtractionResult:
 
 
 # ##################################################################
+# dismiss cookie consent
+# try common cookie consent button selectors; click the first one found
+async def _dismiss_cookie_consent(page) -> None:
+    for selector in COOKIE_CONSENT_SELECTORS:
+        try:
+            button = page.locator(selector).first
+            if await button.is_visible(timeout=500):
+                await button.click()
+                await page.wait_for_load_state("networkidle", timeout=5000)
+                return
+        except Exception:
+            continue
+
+
+# ##################################################################
 # fetch with browser
-# launch browser, navigate, extract content, close browser
+# launch browser, navigate, dismiss cookie consent, extract content, close browser
 async def _fetch_with_browser(url: str, start: float) -> ExtractionResult:
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
@@ -51,6 +82,7 @@ async def _fetch_with_browser(url: str, start: float) -> ExtractionResult:
                     status_code=status_code,
                     elapsed_ms=elapsed,
                 )
+            await _dismiss_cookie_consent(page)
             html = await page.content()
             elapsed = _elapsed_ms(start)
             return _extract_from_html(url, html, status_code, elapsed)
