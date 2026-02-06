@@ -19,7 +19,7 @@ HTTP 4xx/5xx (except 403/429) skip tier 2 and go straight to playwright.
 ## Key Files
 
 - `src/daz_web_extract/result.py` - ExtractionResult frozen dataclass + make_success/make_failure
-- `src/daz_web_extract/content.py` - lxml heuristic: title (og:title > title > h1), body (noise removal + block filtering)
+- `src/daz_web_extract/content.py` - lxml heuristic: `extract_title` (og:title > title > h1), `extract_text_content` (noise removal + block filtering)
 - `src/daz_web_extract/fetch_http.py` - Tier 1: async httpx
 - `src/daz_web_extract/fetch_trafilatura.py` - Tier 2: trafilatura via thread executor
 - `src/daz_web_extract/fetch_playwright.py` - Tier 3: playwright headless chromium
@@ -27,7 +27,7 @@ HTTP 4xx/5xx (except 403/429) skip tier 2 and go straight to playwright.
 
 ## Testing
 
-31 real integration tests (no mocks). Tests hit example.com, httpbin.org, iana.org.
+89 tests total (70 content extraction tests with crafted HTML, 19 integration tests hitting example.com, httpbin.org, iana.org).
 pytest-asyncio with `asyncio_mode = "auto"`.
 
 ## Gotchas
@@ -36,3 +36,6 @@ pytest-asyncio with `asyncio_mode = "auto"`.
 - Playwright chromium must be installed separately: `.venv/bin/playwright install chromium`
 - trafilatura metadata API: `trafilatura.metadata.extract_metadata(html)` returns a `Document` object with `.title`
 - Content body requires >= 100 chars, individual blocks >= 15 chars
+- Noise filtering uses tags, CSS classes, element IDs, and ARIA roles (not just tags)
+- The function is `extract_text_content` (not `extract_body_text`) - named for article text extraction vs future site-driving extractions
+- Link text within paragraphs is preserved (links are part of article content); all HTML formatting is stripped
