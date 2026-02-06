@@ -8,7 +8,10 @@ from daz_web_extract.content import parse_html, extract_title, extract_text_cont
 from daz_web_extract.result import ExtractionResult, make_success, make_failure
 
 TIMEOUT_SECONDS = 10
-USER_AGENT = "Mozilla/5.0 (compatible; daz-web-extract/0.1)"
+USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
 
 
 # ##################################################################
