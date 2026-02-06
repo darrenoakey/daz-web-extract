@@ -92,17 +92,28 @@ def command_extract(args: argparse.Namespace) -> int:
 # build and upload the package to pypi
 def command_publish(_: argparse.Namespace) -> int:
     import glob
+    import os
     import re
     import shutil
 
     pyproject = SCRIPT_DIR / "pyproject.toml"
     content = pyproject.read_text()
-    match = re.search(r'version\s*=\s*"([^"]+)"', content)
-    version = match.group(1) if match else "unknown"
     name_match = re.search(r'name\s*=\s*"([^"]+)"', content)
     name = name_match.group(1) if name_match else "daz-web-extract"
 
-    print(f"\n{_BOLD}Publishing {name} v{version} to PyPI{_RESET}\n")
+    _status("Bumping version...")
+    version_pat = re.compile(r'(version\s*=\s*")(\d+)\.(\d+)\.(\d+)(")')
+    m = version_pat.search(content)
+    if not m:
+        _error("Could not find version in pyproject.toml")
+        return 1
+    maj, minor, _patch = int(m.group(2)), int(m.group(3)), int(m.group(4))
+    new_version = f"{maj}.{minor + 1}.0"
+    content = version_pat.sub(rf"\g<1>{new_version}\g<5>", content)
+    pyproject.write_text(content)
+    _success(f"Version bumped to {new_version}")
+
+    print(f"\n{_BOLD}Publishing {name} v{new_version} to PyPI{_RESET}\n")
 
     _status("Cleaning previous builds...")
     for d in ["dist", "build"]:
@@ -122,8 +133,21 @@ def command_publish(_: argparse.Namespace) -> int:
         _error("No dist files found after build")
         return 1
 
+    _status("Fetching PyPI token from keyring...")
+    result = subprocess.run(
+        [_venv("python"), "-c", "import keyring; print(keyring.get_password('pypi', 'api_token') or '', end='')"],
+        capture_output=True, text=True,
+    )
+    token = result.stdout.strip()
+    if not token:
+        _error("No API token in keyring for service 'pypi' (user: api_token)")
+        _error("Add it with:  python -m keyring set pypi api_token")
+        return 1
+    _success("Token retrieved")
+
     _status("Uploading to PyPI...")
-    rc = _shell([_venv("twine"), "upload"] + dist_files)
+    env = {**os.environ, "TWINE_USERNAME": "__token__", "TWINE_PASSWORD": token}
+    rc = _shell([_venv("twine"), "upload"] + dist_files, env=env)
     if rc != 0:
         _error("Upload failed")
         return rc
@@ -135,7 +159,7 @@ def command_publish(_: argparse.Namespace) -> int:
         if build_dir.exists():
             shutil.rmtree(build_dir)
 
-    print(f"\n{_GREEN}{_BOLD}  Published {name} v{version} to PyPI!{_RESET}")
+    print(f"\n{_GREEN}{_BOLD}  Published {name} v{new_version} to PyPI!{_RESET}")
     print(f"{_CYAN}  pip install {name}{_RESET}\n")
     return 0
 
