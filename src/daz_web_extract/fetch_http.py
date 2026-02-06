@@ -4,7 +4,7 @@ import time
 
 import httpx
 
-from daz_web_extract.content import parse_html, extract_title, extract_body_text
+from daz_web_extract.content import parse_html, extract_title, extract_text_content
 from daz_web_extract.result import ExtractionResult, make_success, make_failure
 
 TIMEOUT_SECONDS = 10
@@ -59,7 +59,7 @@ async def fetch_http(url: str) -> ExtractionResult:
 def _extract_from_html(url: str, html: bytes, status_code: int, elapsed_ms: int) -> ExtractionResult:
     tree = parse_html(html)
     title = extract_title(tree)
-    body = extract_body_text(tree)
+    body = extract_text_content(tree)
     if body is None or len(body) < 100:
         return make_failure(
             url=url,

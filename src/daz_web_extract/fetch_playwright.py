@@ -5,7 +5,7 @@ import time
 
 from playwright.async_api import async_playwright
 
-from daz_web_extract.content import parse_html, extract_title, extract_body_text
+from daz_web_extract.content import parse_html, extract_title, extract_text_content
 from daz_web_extract.result import ExtractionResult, make_success, make_failure
 
 TIMEOUT_MS = 30000
@@ -102,7 +102,7 @@ def _try_trafilatura(html: str) -> str | None:
 def _try_lxml(html: str) -> str | None:
     try:
         tree = parse_html(html)
-        return extract_body_text(tree)
+        return extract_text_content(tree)
     except Exception:
         return None
 
