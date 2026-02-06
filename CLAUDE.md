@@ -24,6 +24,16 @@ HTTP 4xx/5xx (except 403/429) skip tier 2 and go straight to playwright.
 - `src/daz_web_extract/fetch_trafilatura.py` - Tier 2: trafilatura via thread executor
 - `src/daz_web_extract/fetch_playwright.py` - Tier 3: playwright headless chromium
 - `src/daz_web_extract/extract.py` - Orchestrator with skip logic
+- `run` - CLI facade: test, lint, check, extract, publish, verify (no separate run_cli.py)
+
+## Commands (via `./run`)
+
+- `./run test <path>` - Run a single test target
+- `./run lint` - Run ruff linter
+- `./run check` - Run dazpycheck full quality gate
+- `./run extract <url> [--raw]` - Extract content from a URL
+- `./run publish` - Build and upload to PyPI (requires keychain access, run from real terminal)
+- `./run verify` - Lint + full test suite (used by pre-commit hooks)
 
 ## Testing
 
