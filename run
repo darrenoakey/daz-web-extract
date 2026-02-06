@@ -82,26 +82,76 @@ def command_extract(args: argparse.Namespace) -> int:
 
 
 # ##################################################################
+# color helpers for publish output
+_CYAN = "\033[36m"
+_GREEN = "\033[32m"
+_RED = "\033[31m"
+_BOLD = "\033[1m"
+_RESET = "\033[0m"
+
+
+def _status(msg: str) -> None:
+    print(f"{_CYAN}{_BOLD}  → {msg}{_RESET}")
+
+
+def _success(msg: str) -> None:
+    print(f"{_GREEN}{_BOLD}  ✓ {msg}{_RESET}")
+
+
+def _error(msg: str) -> None:
+    print(f"{_RED}{_BOLD}  ✗ {msg}{_RESET}", file=sys.stderr)
+
+
+# ##################################################################
 # command publish
 # build and upload the package to pypi
 def command_publish(_: argparse.Namespace) -> int:
+    import glob
+    import re
     import shutil
+
+    pyproject = SCRIPT_DIR / "pyproject.toml"
+    content = pyproject.read_text()
+    match = re.search(r'version\s*=\s*"([^"]+)"', content)
+    version = match.group(1) if match else "unknown"
+    name_match = re.search(r'name\s*=\s*"([^"]+)"', content)
+    name = name_match.group(1) if name_match else "daz-web-extract"
+
+    print(f"\n{_BOLD}Publishing {name} v{version} to PyPI{_RESET}\n")
+
+    _status("Cleaning previous builds...")
     for d in ["dist", "build"]:
         build_dir = SCRIPT_DIR / d
         if build_dir.exists():
             shutil.rmtree(build_dir)
+
+    _status("Building distribution...")
     rc = _shell([sys.executable, "-m", "build"], cwd=str(SCRIPT_DIR))
     if rc != 0:
-        print("Build failed", file=sys.stderr)
+        _error("Build failed")
         return rc
-    rc = _shell(["twine", "upload", "dist/*"], cwd=str(SCRIPT_DIR))
+    _success("Distribution built")
+
+    dist_files = glob.glob(str(SCRIPT_DIR / "dist" / "*"))
+    if not dist_files:
+        _error("No dist files found after build")
+        return 1
+
+    _status("Uploading to PyPI...")
+    rc = _shell(["twine", "upload"] + dist_files)
     if rc != 0:
-        print("Upload failed", file=sys.stderr)
+        _error("Upload failed")
         return rc
+    _success("Uploaded to PyPI")
+
+    _status("Cleaning up...")
     for d in ["dist", "build"]:
         build_dir = SCRIPT_DIR / d
         if build_dir.exists():
             shutil.rmtree(build_dir)
+
+    print(f"\n{_GREEN}{_BOLD}  Published {name} v{version} to PyPI!{_RESET}")
+    print(f"{_CYAN}  pip install {name}{_RESET}\n")
     return 0
 
 
