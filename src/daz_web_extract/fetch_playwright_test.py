@@ -47,6 +47,7 @@ def test_cookie_consent_selectors_list_is_populated():
 @pytest.mark.asyncio
 async def test_dismiss_cookie_consent_on_page_without_consent_dialog():
     from playwright.async_api import async_playwright
+
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
         try:
