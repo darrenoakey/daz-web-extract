@@ -24,8 +24,7 @@ STAMP = VENV_DIR / ".requirements.sha256"
 
 
 def _bootstrap() -> None:
-    if Path(sys.executable).resolve() == VENV_PYTHON.resolve():
-        return
+    running_in_venv = Path(sys.executable).resolve() == VENV_PYTHON.resolve()
     if not VENV_DIR.exists():
         subprocess.run([sys.executable, "-m", "venv", str(VENV_DIR)], check=True)
     digest = hashlib.sha256(REQUIREMENTS.read_bytes() + PYPROJECT.read_bytes()).hexdigest()
@@ -34,7 +33,8 @@ def _bootstrap() -> None:
         subprocess.run([str(VENV_PYTHON), "-m", "pip", "install", "-q", "-r", str(REQUIREMENTS)], check=True)
         subprocess.run([str(VENV_PYTHON), "-m", "pip", "install", "-q", "-e", str(SCRIPT_DIR)], check=True)
         STAMP.write_text(digest + "\n")
-    os.execv(str(VENV_PYTHON), [str(VENV_PYTHON), str(Path(__file__).resolve()), *sys.argv[1:]])
+    if not running_in_venv:
+        os.execv(str(VENV_PYTHON), [str(VENV_PYTHON), str(Path(__file__).resolve()), *sys.argv[1:]])
 
 
 def _shell(command: list[str], **kwargs: object) -> int:
