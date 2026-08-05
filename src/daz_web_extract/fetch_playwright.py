@@ -20,8 +20,8 @@ COOKIE_CONSENT_SELECTORS = [
     'button:has-text("Accept All")',
     'button:has-text("Accept all")',
     'button:has-text("Accept")',
-    '#onetrust-accept-btn-handler',
-    '.accept-cookies',
+    "#onetrust-accept-btn-handler",
+    ".accept-cookies",
     'button:has-text("I agree")',
     'button:has-text("Allow all")',
     'button:has-text("OK")',
@@ -160,7 +160,11 @@ async def _fetch_page(url: str, start: float, *, js_enabled: bool) -> Extraction
 # extract from html
 # try trafilatura first, fall back to lxml heuristic
 def _extract_from_html(
-    url: str, html: str, status_code: int | None, elapsed_ms: int, method: str,
+    url: str,
+    html: str,
+    status_code: int | None,
+    elapsed_ms: int,
+    method: str,
 ) -> ExtractionResult:
     body = _try_trafilatura(html)
     if body is None or len(body) < 100:
@@ -191,6 +195,7 @@ def _extract_from_html(
 def _try_trafilatura(html: str) -> str | None:
     try:
         import trafilatura
+
         return trafilatura.extract(html)
     except Exception:
         return None

@@ -70,9 +70,9 @@ def test_title_from_title_tag_dash_suffix():
 
 
 # ##################################################################
-# test title from h1 fallback
+# test title from h1 when metadata is missing
 # h1 is used as last resort when no og:title or title tag
-def test_title_from_h1_fallback():
+def test_title_from_h1_when_metadata_is_missing():
     html = """
     <html><head></head><body>
         <h1>Main Heading Text</h1>
@@ -572,7 +572,7 @@ def test_strips_sidebar():
         <h3>Most Popular Articles This Week</h3>
         <ul>
             <li><a href="/1">How to invest in cryptocurrency safely</a></li>
-            <li><a href="/2">Ten tips for better sleep quality tonight</a></li>
+            <li><a href="/2">Ten tips for better rest quality tonight</a></li>
             <li><a href="/3">The best restaurants in downtown Portland</a></li>
         </ul>
     </aside>
@@ -581,7 +581,7 @@ def test_strips_sidebar():
     body = extract_text_content(tree)
     assert body is not None
     assert "cryptocurrency" not in body
-    assert "better sleep" not in body
+    assert "better rest" not in body
     assert "Portland" not in body
 
 
@@ -1191,9 +1191,9 @@ def test_strips_iframes():
 
 
 # ##################################################################
-# test strips noscript fallbacks
-# noscript tags often contain tracking pixels or fallback ad content
-def test_strips_noscript_fallbacks():
+# test strips noscript alternate content
+# noscript tags often contain tracking pixels or alternate ad content
+def test_strips_noscript_alternate_content():
     html = f"""
     <html><body>
         <noscript>
