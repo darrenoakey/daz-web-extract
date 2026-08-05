@@ -52,8 +52,8 @@ pytest-asyncio with `asyncio_mode = "auto"`.
 - `run` operates on **ambient python** (no venv re-exec, no `os.execv`)
 - `_venv("tool")` resolves to `.venv/bin/<tool>` for subprocess calls
 - `command_extract` runs as a venv subprocess (can't import venv packages from ambient python)
-- `command_publish` bumps minor version, fetches PyPI token from keyring, uploads via twine
-- PyPI auth: `keyring.get_password('pypi', 'api_token')` → `TWINE_USERNAME=__token__` + `TWINE_PASSWORD`
+- `command_publish` builds the committed version, fetches `pypi/api_token` through daz-secrets, and uploads in-process via Twine
+- PyPI auth never enters argv, environment variables, files, or logs
 
 ## Gotchas
 
